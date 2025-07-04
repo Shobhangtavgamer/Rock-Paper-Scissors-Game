@@ -1,0 +1,296 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import GameHeader from '../../components/ui/GameHeader';
+import PlayerArea from './components/PlayerArea';
+import GameChoices from './components/GameChoices';
+import GameTimer from './components/GameTimer';
+import RoundHistory from './components/RoundHistory';
+import GameResult from './components/GameResult';
+import Button from '../../components/ui/Button';
+import Icon from '../../components/AppIcon';
+
+const ActiveGameScreen = () => {
+  const navigate = useNavigate();
+  
+  // Game state
+  const [gameState, setGameState] = useState('playing'); // 'playing', 'waiting', 'result'
+  const [currentRound, setCurrentRound] = useState(1);
+  const [playerChoice, setPlayerChoice] = useState(null);
+  const [opponentChoice, setOpponentChoice] = useState(null);
+  const [roundResult, setRoundResult] = useState(null);
+  const [timerReset, setTimerReset] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Mock game data
+  const [gameData] = useState({
+    player1: {
+      id: 1,
+      name: "Alex Johnson",
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      score: 2
+    },
+    player2: {
+      id: 2,
+      name: "Sarah Chen",
+      avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+      score: 1
+    },
+    maxRounds: 5,
+    currentPlayer: 1
+  });
+
+  const [roundHistory, setRoundHistory] = useState([
+    {
+      id: 1,
+      playerChoice: 'rock',
+      opponentChoice: 'scissors',
+      result: 'win'
+    },
+    {
+      id: 2,
+      playerChoice: 'paper',
+      opponentChoice: 'paper',
+      result: 'tie'
+    },
+    {
+      id: 3,
+      playerChoice: 'scissors',
+      opponentChoice: 'rock',
+      result: 'lose'
+    }
+  ]);
+
+  // Game logic
+  const determineWinner = (playerChoice, opponentChoice) => {
+    if (playerChoice === opponentChoice) return 'tie';
+    
+    const winConditions = {
+      rock: 'scissors',
+      paper: 'rock',
+      scissors: 'paper'
+    };
+    
+    return winConditions[playerChoice] === opponentChoice ? 'win' : 'lose';
+  };
+
+  const handlePlayerChoice = (choice) => {
+    if (gameState !== 'playing' || playerChoice) return;
+    
+    setPlayerChoice(choice);
+    setGameState('waiting');
+    
+    // Simulate opponent choice after delay
+    setTimeout(() => {
+      const choices = ['rock', 'paper', 'scissors'];
+      const opponentSelection = choices[Math.floor(Math.random() * choices.length)];
+      setOpponentChoice(opponentSelection);
+      
+      const result = determineWinner(choice, opponentSelection);
+      setRoundResult(result);
+      setGameState('result');
+      setShowResult(true);
+    }, 2000);
+  };
+
+  const handleNextRound = () => {
+    // Add round to history
+    const newRound = {
+      id: roundHistory.length + 1,
+      playerChoice,
+      opponentChoice,
+      result: roundResult
+    };
+    setRoundHistory(prev => [...prev, newRound]);
+    
+    // Check if game is complete
+    const updatedPlayer1Score = gameData.player1.score + (roundResult === 'win' ? 1 : 0);
+    const updatedPlayer2Score = gameData.player2.score + (roundResult === 'lose' ? 1 : 0);
+    
+    if (updatedPlayer1Score >= 3 || updatedPlayer2Score >= 3 || currentRound >= gameData.maxRounds) {
+      navigate('/game-results-screen');
+      return;
+    }
+    
+    // Reset for next round
+    setCurrentRound(prev => prev + 1);
+    setPlayerChoice(null);
+    setOpponentChoice(null);
+    setRoundResult(null);
+    setShowResult(false);
+    setGameState('playing');
+    setTimerReset(prev => prev + 1);
+  };
+
+  const handleTimeUp = () => {
+    if (gameState === 'playing' && !playerChoice) {
+      // Auto-select random choice if time runs out
+      const choices = ['rock', 'paper', 'scissors'];
+      const randomChoice = choices[Math.floor(Math.random() * choices.length)];
+      handlePlayerChoice(randomChoice);
+    }
+  };
+
+  const handlePauseGame = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const handleExitGame = () => {
+    if (window.confirm('Are you sure you want to exit? Your progress will be lost.')) {
+      navigate('/game-setup-screen');
+    }
+  };
+
+  // Check if game is complete
+  const isGameComplete = gameData.player1.score >= 3 || gameData.player2.score >= 3;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <GameHeader />
+      
+      <main className="pt-16 pb-6">
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Game Status Bar */}
+          <div className="bg-surface rounded-xl shadow-morphic p-4 mb-6 border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Icon name="Target" size={20} className="text-primary-500" />
+                  <span className="font-heading-medium text-text-primary">
+                    Round {currentRound} of {gameData.maxRounds}
+                  </span>
+                </div>
+                
+                <div className="hidden sm:block w-px h-6 bg-border"></div>
+                
+                <div className="hidden sm:flex items-center space-x-2">
+                  <Icon name="Trophy" size={16} className="text-accent-500" />
+                  <span className="text-sm text-text-secondary">
+                    First to 3 wins
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  onClick={handlePauseGame}
+                  className="p-2"
+                  iconName={isPaused ? "Play" : "Pause"}
+                />
+                <Button
+                  variant="ghost"
+                  onClick={handleExitGame}
+                  className="p-2"
+                  iconName="X"
+                />
+              </div>
+            </div>
+
+            {/* Timer */}
+            <div className="mt-4">
+              <GameTimer
+                timeLimit={30}
+                isActive={gameState === 'playing' && !isPaused}
+                onTimeUp={handleTimeUp}
+                resetTrigger={timerReset}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Main Game Area */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* Opponent Area */}
+              <PlayerArea
+                player={gameData.player2}
+                isActive={gameState === 'waiting'}
+                hasSelected={!!opponentChoice}
+                selection={opponentChoice}
+                isTop={true}
+                showSelection={gameState === 'result'}
+              />
+
+              {/* Game Choices */}
+              <div className="bg-surface rounded-xl shadow-morphic p-6 border border-border">
+                {gameState === 'waiting' ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <h3 className="text-xl font-heading-medium text-text-primary mb-2">
+                      Waiting for opponent...
+                    </h3>
+                    <p className="text-text-secondary">
+                      {gameData.player2.name} is making their choice
+                    </p>
+                  </div>
+                ) : (
+                  <GameChoices
+                    onChoice={handlePlayerChoice}
+                    disabled={gameState !== 'playing' || isPaused}
+                    selectedChoice={playerChoice}
+                  />
+                )}
+              </div>
+
+              {/* Player Area */}
+              <PlayerArea
+                player={gameData.player1}
+                isActive={gameState === 'playing' && !isPaused}
+                hasSelected={!!playerChoice}
+                selection={playerChoice}
+                showSelection={gameState === 'result'}
+              />
+            </div>
+
+            {/* Sidebar */}
+            <div className="lg:col-span-1">
+              <RoundHistory rounds={roundHistory} />
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Game Result Modal */}
+      {showResult && (
+        <GameResult
+          result={roundResult}
+          playerChoice={playerChoice}
+          opponentChoice={opponentChoice}
+          playerName={gameData.player1.name}
+          opponentName={gameData.player2.name}
+          onNextRound={handleNextRound}
+          onViewResults={() => navigate('/game-results-screen')}
+          isGameComplete={isGameComplete}
+        />
+      )}
+
+      {/* Pause Overlay */}
+      {isPaused && (
+        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-surface rounded-2xl shadow-floating p-8 max-w-sm w-full mx-4">
+            <div className="text-center">
+              <Icon name="Pause" size={48} className="text-primary-500 mx-auto mb-4" />
+              <h3 className="text-xl font-heading-bold text-text-primary mb-2">
+                Game Paused
+              </h3>
+              <p className="text-text-secondary mb-6">
+                The game is currently paused. Resume when you're ready!
+              </p>
+              <Button
+                variant="primary"
+                onClick={handlePauseGame}
+                className="w-full"
+                iconName="Play"
+                iconPosition="left"
+              >
+                Resume Game
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ActiveGameScreen;
